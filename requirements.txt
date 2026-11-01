@@ -1,0 +1,11 @@
+fastapi>=0.115,<1
+uvicorn>=0.34,<1
+SQLAlchemy>=2.0,<3
+PyMySQL[rsa]>=1.1,<2
+croniter>=6,<7
+psutil>=7,<8
+argon2-cffi>=23,<26
+python-dotenv>=1,<2
+filelock>=3,<4
+tzdata>=2025
+cryptography>=46,<52

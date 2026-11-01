@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>QueuePilot · Executor Control</title><link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="/static/email.css"><script src="/static/app.js" defer></script></head>
+<body>
+<section id="login-view" class="login-wrap">
+  <form id="login-form" class="login-card">
+    <span class="logo">q<span>p</span></span><p class="eyebrow">YOUR SERVER. ON SCHEDULE.</p><h1>Welcome back.</h1><p class="muted">Manage your executors and automation from one place.</p>
+    <label>Username<input name="username" autocomplete="username" required></label>
+    <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+    <p id="login-error" class="error" role="alert"></p><button class="primary" type="submit">Sign in <span>→</span></button>
+    <small>Private server control · QueuePilot</small>
+  </form>
+</section>
+<div id="app-view" class="shell" hidden>
+  <aside>
+    <a class="brand" href="/"> <span class="logo">q<span>p</span></span><span>QueuePilot<small>EXECUTOR CONTROL</small></span></a>
+    <p class="nav-label">WORKSPACE</p>
+    <nav><button data-view="overview" class="active">◫ <span>Overview</span></button><button data-view="executors">⌘ <span>Executors</span><b id="nav-count">0</b></button><button data-view="history">↻ <span>Run history</span></button><button data-view="health">◉ <span>Server health</span></button><button data-view="email">✉ <span>Email & alerts</span></button></nav>
+    <div class="side-bottom"><span class="live-dot"></span> Scheduler <strong id="side-state">Connecting</strong><p>Local execution. Full control.</p></div>
+  </aside>
+  <main>
+    <header><div class="breadcrumb">Workspace <span>/</span> <b id="crumb">Overview</b></div><div class="account"><span id="username"></span><button id="logout" class="ghost">Sign out ↗</button></div></header>
+    <div class="content"><div class="page-heading"><div><p class="eyebrow">AUTOMATION WORKSPACE</p><h1 id="page-title">Everything, on schedule.</h1><p class="muted" id="page-description">Your scripts, queues and scheduled jobs in one place.</p></div><button id="add-job" class="primary">＋ New executor</button></div>
+      <div id="connection-error" class="error" role="alert"></div>
+      <section id="stats" class="stats"></section>
+      <section id="overview-view" class="view"><div class="section-title"><h2>Recent activity</h2><button class="text-button" data-view="history">All executions ↗</button></div><div id="recent-runs" class="surface"></div><div class="note"><span>⌘</span><div><h3>Built for your workflow</h3><p>Laravel queues, scheduled commands, Python scripts or any executable. Set a schedule and let your server do the work.</p></div><button class="ghost" id="overview-add">Create an executor →</button></div></section>
+      <section id="executors-view" class="view" hidden><div class="section-title"><h2>Your executors</h2><input id="search" class="search" placeholder="Search this page…" aria-label="Search executors"></div><div id="jobs" class="job-grid"></div><div id="jobs-pagination" class="pagination"></div></section>
+      <section id="history-view" class="view" hidden><div class="section-title"><h2>Execution history</h2><button id="clear-filter" class="ghost" hidden>Show all executors</button></div><div id="history" class="surface"></div><div id="runs-pagination" class="pagination"></div></section>
+      <section id="health-view" class="view" hidden><div class="section-title"><h2>Server vitals</h2><span class="muted">Refreshes every 5 seconds</span></div><div id="health-details" class="health-grid"></div></section>
+      <section id="email-view" class="view" hidden>
+        <div class="section-title"><h2>SMTP & notification preferences</h2><span id="smtp-status" class="badge">Disabled</span></div>
+        <form id="smtp-form" class="settings-panel"><div class="form-grid">
+          <label class="check full"><input type="checkbox" name="enabled"> Enable email reports and notifications</label>
+          <label>SMTP host<input name="host" placeholder="smtp.example.com" maxlength="255"></label><label>Port<input name="port" type="number" min="1" max="65535" value="587" required></label>
+          <label>Connection security<select name="security"><option value="starttls">STARTTLS (usually 587)</option><option value="ssl">SSL / TLS (usually 465)</option><option value="none">None (local relay)</option></select></label>
+          <label>SMTP username<input name="username" autocomplete="off" maxlength="255"></label>
+          <label>SMTP password<input name="password" type="password" autocomplete="new-password" placeholder="Leave blank to keep saved password"><small id="smtp-password-state">No password saved</small></label>
+          <label class="check"><input name="clear_password" type="checkbox"> Remove saved password</label>
+          <label>Sender email<input name="sender" type="email" placeholder="panel@example.com"></label>
+          <label>Recipients<input name="recipients" placeholder="you@example.com, team@example.com"><small>Separate email addresses with commas.</small></label>
+          <label class="check"><input name="notify_failures" type="checkbox" checked> Notify on failures / timeouts</label>
+          <label class="check"><input name="notify_stops" type="checkbox" checked> Notify on stops / interruptions</label>
+          <label class="check"><input name="notify_health" type="checkbox" checked> Notify on health issues</label>
+          <label>Repeat alert cooldown (seconds)<input name="cooldown_seconds" type="number" min="60" max="86400" value="900" required></label>
+        </div><p class="muted">Daily report time and health check thresholds are editable in the two System automation cards under Executors. Email remains off until you enable it.</p>
+        <p id="smtp-error" class="error" role="alert"></p><div class="dialog-actions"><button type="button" id="smtp-test" class="ghost">Send test email</button><button class="primary" type="submit">Save SMTP settings</button></div></form>
+        <div class="section-title"><h2>Email delivery history</h2><span class="muted">Sent means accepted by your SMTP server.</span></div><div id="mail-history" class="surface"></div><div id="mail-pagination" class="pagination"></div>
+      </section>
+      <footer><span>QueuePilot <b>v1.2</b></span><span id="updated">Waiting for server…</span></footer>
+    </div>
+  </main>
+</div>
+<dialog id="job-dialog"><form id="job-form"><div class="dialog-head"><div><p class="eyebrow">EXECUTOR CONFIGURATION</p><h2 id="form-title">New executor</h2></div><button type="button" class="icon" data-close="job-dialog" aria-label="Close">×</button></div>
+  <div class="form-grid"><label class="full">Executor name<input name="name" placeholder="Production queue worker" maxlength="160" required></label>
+  <label>Executor type<select name="kind"><option value="laravel">Laravel · Artisan</option><option value="script">Custom script / command</option></select></label>
+  <label>Execution mode<select name="mode"><option value="continuous">Continuous worker · always running</option><option value="scheduled">Scheduled · custom cron</option></select></label>
+  <label data-scheduled>Run timeout (seconds)<input name="timeout" type="number" min="1" max="604800" value="300" required></label>
+  <label data-continuous>Restart delay (seconds)<input name="restart_delay" type="number" min="1" max="3600" value="5" required></label>
+  <label>Graceful stop wait (seconds)<input name="stop_grace" type="number" min="1" max="3600" value="90" required></label>
+  <p class="muted full" id="mode-help">The worker stays running with no process timeout. If it exits, it restarts automatically. Stop waits for the current job before forcing termination.</p>
+  <label class="full">Working directory<input name="path" placeholder="/var/www/my-app" required><small>Absolute directory on the server. Laravel requires a readable artisan file here.</small></label>
+  <label class="full">Command arguments (JSON array)<textarea name="argv" rows="3" required>["php", "artisan", "queue:work", "--sleep=3", "--tries=3", "--timeout=60"]</textarea><small>Each argument is separate. Laravel --timeout limits a single job, not the worker's lifetime. Shell operators are not interpreted.</small></label>
+  <label data-scheduled>Schedule preset<select id="schedule-preset"><option value="* * * * *">Every minute</option><option value="*/5 * * * *">Every 5 minutes</option><option value="0 * * * *">Every hour</option><option value="0 0 * * *">Daily at midnight</option><option value="0 0 * * 0">Weekly on Sunday</option><option value="custom">Custom cron</option></select></label>
+  <label data-scheduled>Timezone<input name="timezone" value="Asia/Dhaka" required></label>
+  <label class="full" data-scheduled>Cron expression<input name="schedule" value="* * * * *" required><small>minute · hour · day of month · month · day of week</small></label>
+  <label class="check full"><input name="enabled" type="checkbox" checked> <span id="enable-label">Start automatically and keep running</span></label></div>
+  <div id="validation-result" class="validation" role="status"></div><div class="dialog-actions"><button type="button" id="validate-job" class="ghost">Check configuration</button><button type="submit" class="primary">Save executor →</button></div>
+</form></dialog>
+<dialog id="automation-dialog"><form id="automation-form"><div class="dialog-head"><div><p class="eyebrow">SYSTEM AUTOMATION</p><h2 id="automation-title">Automation settings</h2></div><button type="button" class="icon" data-close="automation-dialog" aria-label="Close">×</button></div>
+  <div class="form-grid"><label class="full">Automation name<input name="name" maxlength="160" required></label><label>Cron expression<input name="schedule" required></label><label>Timezone<input name="timezone" value="Asia/Dhaka" required></label>
+  <label data-health-option>CPU alert threshold (%)<input name="cpu_percent" type="number" min="1" max="100" value="95" required></label><label data-health-option>Memory alert threshold (%)<input name="memory_percent" type="number" min="1" max="100" value="90" required></label>
+  <label data-health-option>Disk alert threshold (%)<input name="disk_percent" type="number" min="1" max="100" value="90" required></label><label data-health-option>Queue wait alert after (seconds)<input name="queue_wait_seconds" type="number" min="10" max="86400" value="300" required></label>
+  <label data-health-option>Worker start grace (seconds)<input name="worker_start_grace" type="number" min="5" max="3600" value="60" required></label>
+  <label class="check full"><input name="enabled" type="checkbox" checked> Enable this automation</label></div>
+  <p id="automation-error" class="error" role="alert"></p><div class="dialog-actions"><button class="primary" type="submit">Save automation</button></div>
+</form></dialog>
+<dialog id="log-dialog" class="log-dialog"><div class="dialog-head"><div><p class="eyebrow">EXECUTION LOG</p><h2 id="log-title">Run output</h2></div><button class="icon" data-close="log-dialog" aria-label="Close">×</button></div><div id="log-meta"></div><pre id="log-output"></pre><div class="dialog-actions"><button id="cancel-run" class="danger">Cancel execution</button><button id="download-log" class="ghost">Download log ↓</button></div></dialog>
+<dialog id="confirm-dialog"><h2>Delete this executor?</h2><p>Execution history will remain available.</p><div class="dialog-actions"><button class="ghost" data-close="confirm-dialog">Keep executor</button><button id="confirm-delete" class="danger">Delete executor</button></div></dialog>
+<div id="toast" role="status" hidden></div>
+</body></html>
