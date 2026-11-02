@@ -133,6 +133,22 @@ def me(user=Depends(auth)):
     return user
 
 
+@app.get('/api/directories')
+def directories(path: str = '/', user=Depends(auth)):
+    directory = Path(path)
+    if not directory.is_absolute() or len(path) > 4096:
+        raise HTTPException(422, 'Enter an absolute directory path.')
+    try:
+        directory = directory.resolve(strict=True)
+        if not directory.is_dir():
+            raise HTTPException(422, 'Path is not a directory.')
+        with os.scandir(directory) as entries:
+            names = sorted((entry.name for entry in entries if entry.is_dir()), key=str.casefold)
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise HTTPException(400, 'Cannot access this directory.') from exc
+    return {'path': str(directory), 'parent': str(directory.parent), 'directories': names}
+
+
 @app.post('/api/logout')
 def logout(request: Request, response: Response, user=Depends(auth)):
     with Session.begin() as db:

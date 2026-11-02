@@ -71,6 +71,23 @@ function formData(){const f=$('#job-form');syncLaravel();let argv;try{argv=JSON.
 function validation(text,ok){const el=$('#validation-result');el.className='validation '+(ok?'ok':'bad');el.textContent=text;}
 $('#validate-job').onclick=async e=>{e.target.disabled=true;try{const form=formData();const data=await api('/validate',{method:'POST',body:JSON.stringify(form)});validation(form.mode==='continuous'?'✓ Path and executable verified. Worker will keep running until stopped.':'✓ Path and executable verified. Next run: '+fmt(data.next_run),true);}catch(err){validation(err.message,false);}finally{e.target.disabled=false;}};
 $('#job-form').onsubmit=async e=>{e.preventDefault();e.submitter.disabled=true;try{await api('/jobs'+(state.editing?'/'+state.editing:''),{method:state.editing?'PUT':'POST',body:JSON.stringify(formData())});$('#job-dialog').close();toast('Executor saved and validated');await refresh();}catch(err){validation(err.message,false);}finally{e.submitter.disabled=false;}};
+let directoryCurrent='/', directoryParent='/';
+async function browseDirectory(path){
+  $('#directory-error').textContent='';
+  try{
+    const data=await api('/directories?path='+encodeURIComponent(path));
+    directoryCurrent=data.path;directoryParent=data.parent;
+    $('#directory-current').textContent=data.path;
+    $('#directory-parent').disabled=data.path===data.parent;
+    const list=$('#directory-list');list.replaceChildren();
+    for(const name of data.directories){const button=document.createElement('button');button.type='button';button.className='ghost';button.style.cssText='display:block;width:100%;text-align:left;margin-bottom:4px';button.textContent='📁 '+name;button.onclick=()=>browseDirectory(data.path.replace(/\/$/,'')+'/'+name);list.appendChild(button);}
+    if(!data.directories.length)list.textContent='No folders available.';
+    $('#directory-select').disabled=false;
+  }catch(err){$('#directory-error').textContent=err.message;$('#directory-select').disabled=true;}
+}
+$('#browse-directory').onclick=()=>{const path=$('#job-form').elements.path.value.trim();$('#directory-select').disabled=true;$('#directory-list').replaceChildren();$('#directory-current').textContent='Loading…';$('#directory-dialog').showModal();browseDirectory(path.startsWith('/')?path:'/');};
+$('#directory-parent').onclick=()=>browseDirectory(directoryParent);
+$('#directory-select').onclick=()=>{$('#job-form').elements.path.value=directoryCurrent;$('#directory-dialog').close();};
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$('#'+b.dataset.close).close());
 document.addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;try{
   if(b.dataset.log){await loadLog(Number(b.dataset.log));$('#log-dialog').showModal();}
