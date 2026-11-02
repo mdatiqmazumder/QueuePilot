@@ -141,6 +141,8 @@ Open **Telegram bot** in the sidebar. The settings page includes the complete se
 
 Enable bot commands and set **Allowed Telegram user ID** to authorize remote control. Both chat ID and sender user ID must match. Commands: `/help`, `/status`, `/jobs`, `/run ID`, `/stop ID`. Stop applies to continuous workers and disables automatic restart. Run queues an execution, or starts a continuous worker. Old commands are skipped after authorization changes; commands older than two minutes are ignored.
 
+Send `/start` or `/help` to open the button menu. **Status**, **Executors**, and **Help** are available as buttons; **Executors** shows Start/Stop buttons for the first 20 executors. Typed commands support additional IDs. Button callbacks enforce the same chat and user authorization as typed commands.
+
 Failure, stop, health, and daily-report notifications work independently of SMTP. Delivery history shows attempts and sanitized errors. Failed sends retry up to three times. Long reports are shortened in Telegram; the full report is available in the system automation's execution history. Telegram requires outbound HTTPS and uses polling; use one dedicated bot per panel, remove existing webhooks, and avoid other polling clients. Tokens are encrypted with `data/smtp.key`; include this file in backups. A server or panel that is offline cannot send notifications. A crash after Telegram accepts a message may cause a duplicate on retry.
 
 See the [official Telegram Bot API](https://core.telegram.org/bots/api) for bot creation, `getUpdates`, and `deleteWebhook` details.

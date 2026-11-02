@@ -101,9 +101,25 @@ def api(config, method, payload):
 
 
 def send(config, text):
+    markup = text.get('reply_markup') if isinstance(text, dict) else None
+    text = text['text'] if isinstance(text, dict) else text
     # Keep a single bounded message; full output remains available in the panel.
     text = text if len(text) <= 3800 else text[:3700] + '\n… Open QueuePilot for the full report.'
-    api(config, 'sendMessage', {'chat_id':config['chat_id'], 'text':text})
+    api(config, 'sendMessage', {'chat_id':config['chat_id'], 'text':text,
+        'reply_markup': markup or {'keyboard': [[{'text':'Status'}, {'text':'Executors'}], [{'text':'Help'}]], 'resize_keyboard':True, 'is_persistent':True}})
+
+
+def command_buttons(db, message):
+    command = message.get('text', '').split('@')[0].strip().lower()
+    buttons = []
+    if command in ('executors', '/jobs'):
+        for job in db.scalars(select(Job).where(Job.system_key.is_(None)).order_by(Job.id).limit(20)):
+            row = [{'text':f'▶ #{job.id} {job.name}'[:55], 'callback_data':f'/run {job.id}'}]
+            if job.mode == 'continuous':
+                row.append({'text':f'■ Stop #{job.id}', 'callback_data':f'/stop {job.id}'})
+            buttons.append(row)
+    buttons.append([{'text':'Status', 'callback_data':'/status'}, {'text':'Executors', 'callback_data':'/jobs'}, {'text':'Help', 'callback_data':'/help'}])
+    return {'inline_keyboard':buttons}
 
 
 HELP = 'QueuePilot commands\n/status — server summary\n/jobs — executor IDs and states\n/run ID — start a worker or run an executor\n/stop ID — stop a continuous worker\n/help — show commands'
@@ -116,6 +132,7 @@ def handle_command(db, config, message):
     if not text:
         return None
     command = text[0].split('@')[0].lower()
+    command = {'status':'/status', 'executors':'/jobs', 'help':'/help'}.get(command, command)
     if command in ('/start', '/help'):
         return HELP
     if command == '/status':
@@ -164,6 +181,11 @@ class TelegramBot:
                 return
             row.status, row.attempts = 'sending', row.attempts + 1
             row_id, text = row.id, row.subject + '\n\n' + row.body
+            if row.category == 'command':
+                try:
+                    text = json.loads(row.body)
+                except ValueError:
+                    text = row.body
         try:
             await asyncio.to_thread(send, config, text)
         except Exception:
@@ -182,7 +204,8 @@ class TelegramBot:
             config, offset = settings(db), get_value(db, 'telegram_offset')
         if not config.get('enabled') or not config.get('commands_enabled'):
             return
-        updates = await asyncio.to_thread(api, config, 'getUpdates', {'offset':offset if offset is not None else -1, 'timeout':0, 'limit':20, 'allowed_updates':['message']})
+        updates = await asyncio.to_thread(api, config, 'getUpdates', {'offset':offset if offset is not None else -1, 'timeout':0, 'limit':20, 'allowed_updates':['message', 'callback_query']})
+        callbacks = []
         with Session.begin() as db:
             if settings(db) != config:
                 return
@@ -190,12 +213,21 @@ class TelegramBot:
                 # First poll establishes a baseline; never replay old start/stop commands.
                 if offset is not None:
                     message = update.get('message', {})
+                    callback = update.get('callback_query')
+                    if callback:
+                        callbacks.append(callback['id'])
+                        message = {'chat':callback.get('message', {}).get('chat', {}), 'from':callback.get('from', {}), 'text':callback.get('data', ''), 'date':utcnow().replace(tzinfo=timezone.utc).timestamp()}
                     age = utcnow().replace(tzinfo=timezone.utc).timestamp() - message.get('date', 0)
                     reply = handle_command(db, config, message) if 0 <= age < 120 else None
                     if reply:
-                        queue_message(db, 'command', '[QueuePilot] Bot response', reply)
+                        queue_message(db, 'command', '[QueuePilot] Bot response', json.dumps({'text':reply, 'reply_markup':command_buttons(db, message)}))
                 offset = update['update_id'] + 1
             set_value(db, 'telegram_offset', offset if offset is not None else 0)
+        for callback_id in callbacks:
+            try:
+                await asyncio.to_thread(api, config, 'answerCallbackQuery', {'callback_query_id':callback_id})
+            except Exception:
+                pass
 
     async def loop(self):
         while True:

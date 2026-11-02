@@ -15,7 +15,7 @@
   <aside>
     <a class="brand" href="/"> <span class="logo">q<span>p</span></span><span>QueuePilot<small>EXECUTOR CONTROL</small></span></a>
     <p class="nav-label">WORKSPACE</p>
-    <nav><button data-view="overview" class="active">◫ <span>Overview</span></button><button data-view="executors">⌘ <span>Executors</span><b id="nav-count">0</b></button><button data-view="history">↻ <span>Run history</span></button><button data-view="health">◉ <span>Server health</span></button><button data-view="email">✉ <span>Email & alerts</span></button><button data-view="telegram"><span>Telegram bot</span></button></nav>
+    <nav><button data-view="overview" class="active">◫ <span>Overview</span></button><button data-view="executors">⌘ <span>Executors</span><b id="nav-count">0</b></button><button data-view="history">↻ <span>Run history</span></button><button data-view="health">◉ <span>Server health</span></button><button data-view="email">✉ <span>Email & alerts</span></button><button data-view="telegram">&#10148; <span>Telegram bot</span></button></nav>
     <div class="side-bottom"><span class="live-dot"></span> Scheduler <strong id="side-state">Connecting</strong><p>Local execution. Full control.</p></div>
   </aside>
   <main>
@@ -67,7 +67,7 @@
 <li>Open <code>https://api.telegram.org/botYOUR_TOKEN/getUpdates</code> in your browser. Copy <code>message.chat.id</code> as Chat ID and <code>message.from.id</code> as your user ID. Keep the token and URL private.</li>
 <li>Enable notifications, enter Chat ID and save. Click <strong>Send test message</strong>; check delivery history below.</li>
 <li>For remote control, enter your user ID and enable commands. Save, wait a few seconds, then send <code>/help</code>. Only the configured user in the configured chat is authorized.</li></ol>
-<p><code>/status</code> Server summary<br><code>/jobs</code> Executor IDs<br><code>/run 3</code> Start worker or run executor<br><code>/stop 3</code> Stop continuous worker<br><code>/help</code> Show commands</p>
+<p>Send <code>/start</code> or <code>/help</code> after enabling commands to open the button menu. Tap <strong>Executors</strong> for Start/Stop buttons (first 20 executors); use typed commands for additional IDs.</p><p><code>/status</code> Server summary<br><code>/jobs</code> Executor IDs<br><code>/run 3</code> Start worker or run executor<br><code>/stop 3</code> Stop continuous worker<br><code>/help</code> Show commands</p>
 <p class="muted">Use a dedicated bot per server. Requires outbound HTTPS, with no public webhook. If your bot has a webhook, remove it with Telegram's deleteWebhook method first. Stop using getUpdates elsewhere after setup. Old commands are skipped after changing authorization. Daily report time is editable under Executors, in the Daily report system automation. Telegram works independently of SMTP. A stopped server cannot send alerts. Messages over 3,800 characters are shortened; full reports remain in panel history.</p>
 </details><h2>Recent Telegram deliveries</h2><div id="tg-history" class="surface"></div></section>
       <footer><span>QueuePilot <b>v1.2</b></span><span id="updated">Waiting for server…</span></footer>

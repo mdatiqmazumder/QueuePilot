@@ -557,3 +557,34 @@ def test_telegram_delivery_retry_and_token_redaction(client,monkeypatch):
         assert row.status=='pending' and row.attempts==1
         assert 'SECRET' not in row.last_error
     client.put('/api/telegram',headers=headers,json={'enabled':False}).raise_for_status()
+
+
+def test_telegram_buttons_and_callback_authorization(client,monkeypatch):
+    import asyncio
+    headers=sign_in(client)
+    client.put('/api/telegram',headers=headers,json={'enabled':True,'token':'123456:SECRET_token','chat_id':'123','commands_enabled':True,'allowed_user_id':'456'}).raise_for_status()
+    data=payload();data.update(mode='continuous',enabled=False)
+    job_id=create(client,headers,data)
+    with Session.begin() as db:
+        tg.set_value(db,'telegram_offset',100)
+    calls=[]
+    def api(config,method,body):
+        calls.append((method,body))
+        if method=='getUpdates':
+            return [
+                {'update_id':100,'callback_query':{'id':'unauthorized','from':{'id':999},'message':{'chat':{'id':123}},'data':f'/run {job_id}'}},
+                {'update_id':101,'callback_query':{'id':'authorized','from':{'id':456},'message':{'chat':{'id':123}},'data':'/jobs'}},
+            ]
+        return True
+    monkeypatch.setattr(tg,'api',api)
+    asyncio.run(tg.bot.poll())
+    with Session() as db:
+        assert not db.get(Job,job_id).enabled
+        rows=db.scalars(select(TelegramDelivery).where(TelegramDelivery.category=='command')).all()
+        body=json.loads(rows[-1].body)
+        assert body['reply_markup']['inline_keyboard'][-1][0]['callback_data']=='/status'
+        assert tg.get_value(db,'telegram_offset')==102
+    assert sum(method=='answerCallbackQuery' for method,_ in calls)==2
+    tg.send({'chat_id':'123'},'Test')
+    assert calls[-1][1]['reply_markup']['keyboard'][0][0]['text']=='Status'
+    client.put('/api/telegram',headers=headers,json={'enabled':False}).raise_for_status()
