@@ -95,9 +95,9 @@ The command uses sudo when necessary. Settings changes restart the service. To c
 
 ## Continuous Laravel workers
 
-Create an executor with **Type: Laravel**, **Execution mode: Continuous worker**, and your application's absolute working directory, such as `/var/www/my-app`.
+Create an executor with **Type: Laravel**, **Laravel task: Queue worker**, and your application's absolute working directory, such as `/var/www/my-app`. Fill in the PHP executable, queue names, idle sleep, maximum attempts, job timeout, and optional worker recycling interval. QueuePilot builds the command and selects continuous mode automatically; a command preview shows what will run.
 
-Enter command arguments as a JSON array:
+For additional Artisan options, select **Custom Artisan command · advanced** and enter arguments as a JSON array. Existing commands with extra or unsupported options remain in the advanced editor so they are preserved:
 
 ```json
 ["php", "artisan", "queue:work", "--sleep=3", "--tries=3", "--timeout=60"]
@@ -114,6 +114,8 @@ After deploying Laravel code, `php artisan queue:restart` asks the worker to exi
 For multiple workers, create separate continuous executors with different names. Each worker occupies one execution slot. If every slot is occupied by continuous workers, scheduled executors wait in the queue. Adjust the limit using `queuepilot settings`.
 
 ## Scheduled scripts and commands
+
+For Laravel's scheduler, select **Laravel task: Scheduler · every minute** and enter the application directory. QueuePilot builds `php artisan schedule:run` and sets the schedule to `* * * * *`. Output is available in execution history. Remove any existing equivalent crontab entry before enabling this executor to avoid duplicate execution. You can adjust the schedule if needed.
 
 Choose **Execution mode: Scheduled** and supply a five-field cron expression, timezone, working directory, and command arguments.
 
