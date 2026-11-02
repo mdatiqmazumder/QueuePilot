@@ -108,7 +108,7 @@ def daily_report(db, run_id):
         lines.append('Health issue: '+issue['message'])
     report = '\n'.join(lines)
     delivery_id = queue_mail(db, 'report', '[QueuePilot] Daily server report', report)
-    return f'Daily report queued as email #{delivery_id}.\n{report}' if delivery_id else f'SMTP disabled; daily email skipped.\n{report}'
+    return f'Daily report queued as notification #{delivery_id}.\n{report}' if delivery_id else f'No notification queued; check channel settings.\n{report}'
 
 
 async def execute_system(run_id, payload):

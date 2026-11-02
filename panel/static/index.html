@@ -15,7 +15,7 @@
   <aside>
     <a class="brand" href="/"> <span class="logo">q<span>p</span></span><span>QueuePilot<small>EXECUTOR CONTROL</small></span></a>
     <p class="nav-label">WORKSPACE</p>
-    <nav><button data-view="overview" class="active">◫ <span>Overview</span></button><button data-view="executors">⌘ <span>Executors</span><b id="nav-count">0</b></button><button data-view="history">↻ <span>Run history</span></button><button data-view="health">◉ <span>Server health</span></button><button data-view="email">✉ <span>Email & alerts</span></button></nav>
+    <nav><button data-view="overview" class="active">◫ <span>Overview</span></button><button data-view="executors">⌘ <span>Executors</span><b id="nav-count">0</b></button><button data-view="history">↻ <span>Run history</span></button><button data-view="health">◉ <span>Server health</span></button><button data-view="email">✉ <span>Email & alerts</span></button><button data-view="telegram"><span>Telegram bot</span></button></nav>
     <div class="side-bottom"><span class="live-dot"></span> Scheduler <strong id="side-state">Connecting</strong><p>Local execution. Full control.</p></div>
   </aside>
   <main>
@@ -46,6 +46,30 @@
         <p id="smtp-error" class="error" role="alert"></p><div class="dialog-actions"><button type="button" id="smtp-test" class="ghost">Send test email</button><button class="primary" type="submit">Save SMTP settings</button></div></form>
         <div class="section-title"><h2>Email delivery history</h2><span class="muted">Sent means accepted by your SMTP server.</span></div><div id="mail-history" class="surface"></div><div id="mail-pagination" class="pagination"></div>
       </section>
+<section id="telegram-view" class="view" hidden>
+<h2>Telegram bot settings</h2>
+<form id="telegram-form" class="settings-panel"><div class="form-grid">
+<label class="check full"><input name="enabled" type="checkbox"> Enable Telegram notifications</label>
+<label>Bot token<input name="token" type="password" autocomplete="new-password" placeholder="Leave blank to keep saved token"><small id="tg-token-state"></small></label>
+<label>Chat ID<input name="chat_id" placeholder="123456789 or -100..."></label>
+<label class="check"><input name="clear_token" type="checkbox"> Remove saved token</label>
+<label class="check"><input name="commands_enabled" type="checkbox"> Enable bot commands</label>
+<label>Allowed Telegram user ID<input name="allowed_user_id"><small>Only this user in the configured chat can control executors.</small></label>
+<label>Alert cooldown (seconds)<input name="cooldown_seconds" type="number" min="60" max="86400" value="900" required></label>
+<label class="check"><input name="notify_failures" type="checkbox" checked> Failure alerts</label>
+<label class="check"><input name="notify_stops" type="checkbox" checked> Stop alerts</label>
+<label class="check"><input name="notify_health" type="checkbox" checked> Health alerts</label>
+<label class="check"><input name="notify_reports" type="checkbox" checked> Daily reports</label>
+</div><p id="tg-error" class="error" role="alert"></p><div class="dialog-actions"><button type="button" id="tg-test" class="ghost">Send test message</button><button class="primary">Save Telegram settings</button></div></form>
+<details class="settings-panel" open><summary><strong>Setup guide &amp; bot commands</strong></summary>
+<ol><li>In Telegram, open <strong>@BotFather</strong>, send <code>/newbot</code> and follow the prompts. Paste the token above.</li>
+<li>Open your new bot and send <code>/start</code>. For a group, add the bot and send it a command.</li>
+<li>Open <code>https://api.telegram.org/botYOUR_TOKEN/getUpdates</code> in your browser. Copy <code>message.chat.id</code> as Chat ID and <code>message.from.id</code> as your user ID. Keep the token and URL private.</li>
+<li>Enable notifications, enter Chat ID and save. Click <strong>Send test message</strong>; check delivery history below.</li>
+<li>For remote control, enter your user ID and enable commands. Save, wait a few seconds, then send <code>/help</code>. Only the configured user in the configured chat is authorized.</li></ol>
+<p><code>/status</code> Server summary<br><code>/jobs</code> Executor IDs<br><code>/run 3</code> Start worker or run executor<br><code>/stop 3</code> Stop continuous worker<br><code>/help</code> Show commands</p>
+<p class="muted">Use a dedicated bot per server. Requires outbound HTTPS, with no public webhook. If your bot has a webhook, remove it with Telegram's deleteWebhook method first. Stop using getUpdates elsewhere after setup. Old commands are skipped after changing authorization. Daily report time is editable under Executors, in the Daily report system automation. Telegram works independently of SMTP. A stopped server cannot send alerts. Messages over 3,800 characters are shortened; full reports remain in panel history.</p>
+</details><h2>Recent Telegram deliveries</h2><div id="tg-history" class="surface"></div></section>
       <footer><span>QueuePilot <b>v1.2</b></span><span id="updated">Waiting for server…</span></footer>
     </div>
   </main>

@@ -135,6 +135,18 @@ Scheduled runs have a process timeout. Failed scheduled runs are not automatical
 
 ## SMTP notifications and reports
 
+## Telegram bot
+
+Open **Telegram bot** in the sidebar. The settings page includes the complete setup guide and command reference. Create a dedicated bot with **@BotFather** using `/newbot`, open the new bot and send `/start`, then find `message.chat.id` and `message.from.id` using Telegram's `getUpdates` API before enabling polling. Keep your bot token private. Enter the token and Chat ID, enable Telegram, save, and send a test message.
+
+Enable bot commands and set **Allowed Telegram user ID** to authorize remote control. Both chat ID and sender user ID must match. Commands: `/help`, `/status`, `/jobs`, `/run ID`, `/stop ID`. Stop applies to continuous workers and disables automatic restart. Run queues an execution, or starts a continuous worker. Old commands are skipped after authorization changes; commands older than two minutes are ignored.
+
+Failure, stop, health, and daily-report notifications work independently of SMTP. Delivery history shows attempts and sanitized errors. Failed sends retry up to three times. Long reports are shortened in Telegram; the full report is available in the system automation's execution history. Telegram requires outbound HTTPS and uses polling; use one dedicated bot per panel, remove existing webhooks, and avoid other polling clients. Tokens are encrypted with `data/smtp.key`; include this file in backups. A server or panel that is offline cannot send notifications. A crash after Telegram accepts a message may cause a duplicate on retry.
+
+See the [official Telegram Bot API](https://core.telegram.org/bots/api) for bot creation, `getUpdates`, and `deleteWebhook` details.
+
+## Email settings
+
 Open **Email & alerts**, enter your SMTP host, port, security mode, username/password, sender, and recipients, then enable email delivery and save. Use **Send test email** and inspect the delivery history.
 
 Emails include a branded HTML layout with status badges and readable details for failure, stop, health, and daily report messages. A plain-text alternative is included for mail clients that do not display HTML. No external images are required.

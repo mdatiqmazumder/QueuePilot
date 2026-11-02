@@ -122,9 +122,11 @@ def save_settings(db, data):
 
 
 def queue_mail(db, category, subject, body, event_key=None, cooldown=None):
+    from .telegram import queue_message
+    telegram_id = queue_message(db, category, subject, body, event_key, cooldown) if category in ('failure', 'stop', 'health', 'report') else None
     config = settings(db)
     if not config.get('enabled'):
-        return None
+        return f'tg-{telegram_id}' if telegram_id else None
     flag = {'failure':'notify_failures', 'stop':'notify_stops', 'health':'notify_health'}.get(category)
     if flag and not config.get(flag, True):
         return None

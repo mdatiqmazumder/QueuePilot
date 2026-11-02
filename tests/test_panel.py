@@ -493,3 +493,67 @@ def test_health_audit_detects_missing_path_and_sends_alert(client,monkeypatch):
     finally:
         client.put('/api/smtp',json=smtp_payload(enabled=False),headers=headers)
         client.delete(f'/api/jobs/{job_id}',headers=headers)
+
+
+"""Telegram delivery is mocked; no messages leave the test environment."""
+import pytest
+from sqlalchemy import select
+
+from panel import telegram as tg
+from panel.database import Session, TelegramDelivery, Job, Run, utcnow
+from panel.notifications import queue_mail
+
+
+def test_telegram_auth_settings_and_independent_alerts(client):
+    headers=sign_in(client)
+    response=client.put('/api/telegram',headers=headers,json={'enabled':True,'token':'123456:SECRET_token','chat_id':'123','commands_enabled':True,'allowed_user_id':'456'})
+    assert response.status_code==200,response.text
+    assert response.json()['token_set'] is True
+    assert 'SECRET' not in response.text and 'token_encrypted' not in response.text
+    with Session.begin() as db:
+        config=tg.settings(db)
+        assert 'SECRET' not in config['token_encrypted']
+        assert queue_mail(db,'failure','[QueuePilot] FAILURE: test','Example',event_key='test')
+        assert tg.queue_message(db,'failure','Duplicate','Example',event_key='test') is None
+    assert client.post('/api/telegram/test',headers=headers).status_code==200
+    data=payload();data.update(mode='continuous',enabled=False)
+    job_id=create(client,headers,data)
+    with Session.begin() as db:
+        config=tg.settings(db)
+        message={'chat':{'id':123},'from':{'id':999},'text':f'/run {job_id}'}
+        assert tg.handle_command(db,config,message) is None
+        assert not db.get(Job,job_id).enabled
+        message['from']['id']=456
+        message['chat']['id']=789
+        assert tg.handle_command(db,config,message) is None
+        message['chat']['id']=123
+        assert 'Queued' in tg.handle_command(db,config,message)
+        assert db.get(Job,job_id).enabled
+        message['text']=f'/stop {job_id}'
+        assert 'Stop requested' in tg.handle_command(db,config,message)
+        assert not db.get(Job,job_id).enabled
+    client.put('/api/telegram',headers=headers,json={'enabled':False}).raise_for_status()
+
+
+def test_telegram_delivery_retry_and_token_redaction(client,monkeypatch):
+    headers=sign_in(client)
+    client.put('/api/telegram',headers=headers,json={'enabled':True,'token':'123456:SECRET_token','chat_id':'123'}).raise_for_status()
+    sent=[]
+    monkeypatch.setattr(tg,'send',lambda config,text:sent.append(text))
+    with Session.begin() as db:
+        row_id=tg.queue_message(db,'test','Test','Hello')
+    import asyncio
+    asyncio.run(tg.bot.deliver_one())
+    with Session() as db:
+        assert db.get(TelegramDelivery,row_id).status=='sent'
+    assert sent and 'Hello' in sent[0]
+    def fail(*args):raise RuntimeError('https://api.telegram.org/botSECRET_token')
+    monkeypatch.setattr(tg,'send',fail)
+    with Session.begin() as db:
+        row_id=tg.queue_message(db,'test','Test failure','Hello')
+    asyncio.run(tg.bot.deliver_one())
+    with Session() as db:
+        row=db.get(TelegramDelivery,row_id)
+        assert row.status=='pending' and row.attempts==1
+        assert 'SECRET' not in row.last_error
+    client.put('/api/telegram',headers=headers,json={'enabled':False}).raise_for_status()

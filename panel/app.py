@@ -25,6 +25,8 @@ from .migrations import migrate
 from .validation import JobInput, next_time, validate_job
 from .notifications import SMTPInput, executor_event, get_value, mailer, public_settings, queue_mail, save_settings
 from .system_jobs import AutomationInput, seed_automations
+from . import telegram
+from .database import TelegramDelivery
 
 hasher = PasswordHasher()
 attempts = OrderedDict()
@@ -43,10 +45,12 @@ async def lifespan(app):
         migrate()
         seed_automations()
         mailer.recover()
+        telegram.bot.recover()
         runner.stopping = False
         runner.recover()
         scheduler = asyncio.create_task(runner.loop())
         email_task = asyncio.create_task(mailer.loop())
+        telegram_task = asyncio.create_task(telegram.bot.loop())
         try:
             yield
         finally:
@@ -55,6 +59,8 @@ async def lifespan(app):
             await runner.shutdown()
             email_task.cancel()
             await asyncio.gather(email_task, return_exceptions=True)
+            telegram_task.cancel()
+            await asyncio.gather(telegram_task, return_exceptions=True)
     finally:
         lock.release()
 
@@ -267,6 +273,37 @@ async def update_automation(job_id: int, data: AutomationInput, user=Depends(aut
 async def smtp_settings(user=Depends(auth)):
     with Session() as db:
         return public_settings(db)
+
+
+@app.get('/api/telegram')
+def telegram_settings(user=Depends(auth)):
+    with Session() as db:
+        return telegram.public_settings(db)
+
+
+@app.put('/api/telegram')
+def telegram_save(data: telegram.TelegramInput, user=Depends(auth)):
+    with Session.begin() as db:
+        try:
+            return telegram.save_settings(db, data)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+
+
+@app.post('/api/telegram/test')
+def telegram_test(user=Depends(auth)):
+    with Session.begin() as db:
+        row_id = telegram.queue_message(db, 'test', '[QueuePilot] Telegram test', 'Your QueuePilot Telegram bot is connected.')
+        if not row_id:
+            raise HTTPException(409, 'Save and enable Telegram first')
+        return {'id': row_id}
+
+
+@app.get('/api/telegram/history')
+def telegram_history(user=Depends(auth)):
+    with Session() as db:
+        rows = db.scalars(select(TelegramDelivery).order_by(TelegramDelivery.id.desc()).limit(50))
+        return {'items': [{key:getattr(row, key) for key in ('id', 'subject', 'status', 'attempts', 'created_at', 'last_error')} for row in rows]}
 
 
 @app.put('/api/smtp')
