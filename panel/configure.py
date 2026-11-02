@@ -20,6 +20,8 @@ def main():
     if hasattr(os, 'chown'):
         os.chown('.env', original.st_uid, original.st_gid)
     os.chmod('.env', 0o640)
+    from .firewall import allow_panel_port
+    allow_panel_port()
 
 
 if __name__ == '__main__':

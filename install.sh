@@ -58,6 +58,7 @@ PY
   .venv/bin/pip install -r requirements.txt
   install -d -o "$service_user" -g "$service_group" -m 0700 data
   .venv/bin/python -m panel.setup
+  .venv/bin/python -m panel.firewall
   chown root:"$service_group" .env
   chmod 0640 .env
   chown "$service_user:$service_group" data
@@ -92,7 +93,7 @@ EOF
   fi
   echo 'Installed. Type queuepilot to open the management menu.'
   echo 'Health audit and daily report automations are ready. Configure SMTP in the panel under Email & alerts.'
-  echo 'Allow the configured panel port in your firewall or use an HTTPS reverse proxy.'
+  echo 'The panel port is allowed in UFW when available. Check any provider firewall separately.'
   if [[ -n "$temp_dir" ]]; then rm -rf -- "$temp_dir"; fi
 }
 

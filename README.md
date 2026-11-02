@@ -88,11 +88,14 @@ queuepilot settings   # Change port, bind address, concurrency, or HTTPS cookies
 queuepilot password   # Reset an admin password and revoke existing sessions
 queuepilot doctor    # Check database access, configuration, and PHP availability
 queuepilot update    # Download updates, back up, and restart the panel
+queuepilot firewall  # Allow the configured TCP port through UFW
 queuepilot enable    # Start the service at boot
 queuepilot disable
 ```
 
 The command uses sudo when necessary. Settings changes restart the service. To change database credentials, edit `/opt/queuepilot/.env` as root and restart QueuePilot. The configuration file is readable only by root and the service group (mode 0640).
+
+Installation, updates, and port changes automatically add an allow rule for the configured TCP port when UFW is installed and the panel listens on a public interface. Localhost-only installations skip this rule. UFW is not enabled automatically, and existing rules are preserved. Cloud security groups, provider firewalls, and Windows/WSL networking must be configured separately when applicable. You can reapply the rule with `queuepilot firewall`.
 
 ## Continuous Laravel workers
 

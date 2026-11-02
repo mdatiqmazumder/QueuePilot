@@ -91,6 +91,7 @@ PY
   install -m 0755 "$source/bin/queuepilot" /usr/local/bin/queuepilot
   printf '%s\n' "$revision" > "$INSTALL_DIR/.installed-revision"
   /usr/local/bin/queuepilot setup-ui-updates
+  /usr/local/bin/queuepilot firewall
   stopped=0
   update_state success
   echo "QueuePilot updated. Backup: $backup"
@@ -107,7 +108,8 @@ action() {
     doctor) (cd "$INSTALL_DIR" && .venv/bin/python -m panel.doctor) ;;
     update) update_panel ;;
     setup-ui-updates) setup_ui_updates ;;
-    help) echo 'queuepilot [start|stop|restart|status|logs|follow|enable|disable|settings|password|doctor|update|help]' ;;
+    firewall) (cd "$INSTALL_DIR" && .venv/bin/python -m panel.firewall) ;;
+    help) echo 'queuepilot [start|stop|restart|status|logs|follow|enable|disable|settings|password|doctor|update|firewall|help]' ;;
     *) echo "Unknown command: $1"; return 1 ;;
   esac
 }
