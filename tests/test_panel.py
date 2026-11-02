@@ -306,6 +306,25 @@ def test_smtp_transport_security_and_authentication(client,monkeypatch,security)
     assert any(c[0]=='starttls' for c in calls)==(security=='starttls')
     assert ('context' in calls[0][2])==(security=='ssl')
     assert calls[-1][1]['To']=='owner@example.test'
+    message=calls[-1][1]
+    assert message.get_content_type()=='multipart/alternative'
+    assert message.get_body(preferencelist=('plain',)).get_content().strip()=='Body'
+    assert 'QueuePilot' in message.get_body(preferencelist=('html',)).get_content()
+
+
+@pytest.mark.parametrize('subject,label',[
+    ('[QueuePilot] FAILURE: worker','ACTION REQUIRED'),
+    ('[QueuePilot] STOP: worker','WORKER STOPPED'),
+    ('[QueuePilot] Health alert','HEALTH ALERT'),
+    ('[QueuePilot] Daily server report','DAILY REPORT'),
+])
+def test_html_email_escapes_untrusted_content(subject,label):
+    from panel.email_templates import render_email
+    html=render_email(subject+' <script>', 'Executor: <img src=x onerror=alert(1)>\nHealth issue: <script>alert(1)</script>\nRun totals: {"success": 3}')
+    assert label in html
+    assert '<script>' not in html and '<img src=x' not in html
+    assert '&lt;script&gt;' in html and '&lt;img' in html
+    assert '<strong>Success</strong>: 3' in html
 
 
 def test_local_smtp_delivery_and_history(client):

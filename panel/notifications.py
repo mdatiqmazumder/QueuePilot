@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy import select
 
 from .database import DATA_DIR, MailDelivery, Session, Setting, utcnow
+from .email_templates import render_email
 
 log = logging.getLogger(__name__)
 EMAIL = re.compile(r'^[^\s<>@,;]+@[^\s<>@,;]+\.[^\s<>@,;]+$')
@@ -156,6 +157,7 @@ def send_smtp(config, subject, body, message_id):
     message['To'] = ', '.join(config['recipients'])
     message['Message-ID'] = f'<queuepilot-{message_id}@{config["sender"].split("@")[-1]}>'
     message.set_content(body)
+    message.add_alternative(render_email(subject, body), subtype='html')
     context = ssl.create_default_context()
     client_type = smtplib.SMTP_SSL if config['security'] == 'ssl' else smtplib.SMTP
     kwargs = {'context':context} if config['security'] == 'ssl' else {}

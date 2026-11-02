@@ -137,6 +137,8 @@ Scheduled runs have a process timeout. Failed scheduled runs are not automatical
 
 Open **Email & alerts**, enter your SMTP host, port, security mode, username/password, sender, and recipients, then enable email delivery and save. Use **Send test email** and inspect the delivery history.
 
+Emails include a branded HTML layout with status badges and readable details for failure, stop, health, and daily report messages. A plain-text alternative is included for mail clients that do not display HTML. No external images are required.
+
 - STARTTLS and SSL/TLS verify certificates and do not fall back to an unencrypted connection.
 - **None** is available for a trusted local SMTP relay.
 - Leaving the password blank keeps the saved password; **Remove saved password** clears it.
