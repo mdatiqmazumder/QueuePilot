@@ -87,6 +87,7 @@ queuepilot follow     # Follow logs; Ctrl+C to exit
 queuepilot settings   # Change port, bind address, concurrency, or HTTPS cookies
 queuepilot password   # Reset an admin password and revoke existing sessions
 queuepilot doctor    # Check database access, configuration, and PHP availability
+queuepilot update    # Download updates, back up, and restart the panel
 queuepilot enable    # Start the service at boot
 queuepilot disable
 ```
@@ -208,8 +209,8 @@ Windows supports API/UI development; the production installer, systemd integrati
 
 ## Backup and updates
 
-Back up the MySQL database, `/opt/queuepilot/.env`, and `data/smtp.key`. Execution and email history live in MySQL. There is no automatic log-retention policy or automatic updater in this version.
+Back up the MySQL database, `/opt/queuepilot/.env`, and `data/smtp.key`. Execution and email history live in MySQL. There is no automatic log-retention policy.
 
-For a manual update, stop QueuePilot, replace application source files, install updated requirements, and start it again. Preserve `.env` and `data/`. Additive schema migrations run at startup, and built-in automation settings are preserved.
+Run `queuepilot update` to download the latest GitHub source, back up the installation, install requirements, and restart the panel. Settings and `data/` are preserved. A failed update restores the installation backup and attempts to start the panel again. Backups are kept beside `/opt/queuepilot`; they do not include a MySQL database backup. Additive schema migrations run at startup, and built-in automation settings are preserved.
 
 The systemd unit uses `KillMode=mixed` and `TimeoutStopSec=3700` so the panel can gracefully stop its workers before systemd performs final process-group cleanup.
