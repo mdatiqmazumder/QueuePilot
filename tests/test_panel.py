@@ -588,3 +588,22 @@ def test_telegram_buttons_and_callback_authorization(client,monkeypatch):
     tg.send({'chat_id':'123'},'Test')
     assert calls[-1][1]['reply_markup']['keyboard'][0][0]['text']=='Status'
     client.put('/api/telegram',headers=headers,json={'enabled':False}).raise_for_status()
+
+
+def test_ui_update_check_request_and_csrf(client,monkeypatch,tmp_path):
+    from panel import updates
+    revision='a'*40
+    monkeypatch.setattr(updates,'INSTALL',tmp_path)
+    monkeypatch.setattr(updates,'STATE',tmp_path/'state.json')
+    monkeypatch.setattr(updates,'REQUEST',tmp_path/'request')
+    monkeypatch.setattr(updates,'latest_revision',lambda:revision)
+    monkeypatch.setattr(updates,'service_active',lambda unit:unit.endswith('.path'))
+    headers=sign_in(client)
+    assert client.post('/api/updates/install').status_code==403
+    result=client.post('/api/updates/check',headers=headers).json()
+    assert result['available'] and result['latest']==revision
+    (tmp_path/'.installed-revision').write_text(revision)
+    assert not client.get('/api/updates').json()['available']
+    assert client.post('/api/updates/install',headers=headers).status_code==202
+    assert (tmp_path/'request').read_text()=='update\n'
+    assert client.post('/api/updates/install',headers=headers).status_code==409

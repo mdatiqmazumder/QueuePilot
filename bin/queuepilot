@@ -4,6 +4,43 @@ INSTALL_DIR=/opt/queuepilot
 SERVICE=queuepilot
 if [[ $EUID -ne 0 ]]; then exec sudo -- "$0" "$@"; fi
 if [[ ! -f "$INSTALL_DIR/.env" ]]; then echo 'Run install.sh first.'; exit 1; fi
+setup_ui_updates() {
+  local panel_user
+  panel_user=$(systemctl show "$SERVICE" -p User --value)
+  id "$panel_user" >/dev/null
+  install -d -o "$panel_user" -m 0700 /var/lib/queuepilot-updates
+  cat > /etc/systemd/system/queuepilot-update.service <<'UNIT'
+[Unit]
+Description=QueuePilot application update
+After=network-online.target
+[Service]
+Type=oneshot
+ExecStartPre=/usr/bin/rm -f /var/lib/queuepilot-updates/request
+ExecStart=/usr/local/bin/queuepilot update
+TimeoutStartSec=7200
+UNIT
+  cat > /etc/systemd/system/queuepilot-update.path <<'UNIT'
+[Unit]
+Description=Watch for QueuePilot update requests
+[Path]
+PathExists=/var/lib/queuepilot-updates/request
+Unit=queuepilot-update.service
+[Install]
+WantedBy=multi-user.target
+UNIT
+  systemctl daemon-reload
+  systemctl enable --now queuepilot-update.path
+}
+update_state() {
+  /usr/bin/python3 - "$1" <<'PY'
+import json, os, sys
+path = '/var/lib/queuepilot-update-state.json'
+with open(path + '.tmp', 'w') as file:
+    json.dump({'status': sys.argv[1]}, file)
+os.chmod(path + '.tmp', 0o644)
+os.replace(path + '.tmp', path)
+PY
+}
 update_panel() (
   set -euo pipefail
   local stage backup stopped=0
@@ -16,13 +53,20 @@ update_panel() (
     if (( result != 0 && stopped )); then
       echo "Update failed. Restoring $backup"
       cp -a "$backup/." "$INSTALL_DIR/"
+      if [[ ! -f "$backup/.installed-revision" ]]; then rm -f "$INSTALL_DIR/.installed-revision"; fi
       systemctl start "$SERVICE" || true
     fi
+    if (( result != 0 )); then update_state failed; fi
     return "$result"
   }
   trap recover EXIT
+  update_state running
   echo 'Downloading QueuePilot...'
-  curl -fL --retry 3 https://github.com/mdatiqmazumder/QueuePilot/archive/refs/heads/main.tar.gz -o "$stage/source.tar.gz"
+  curl -fsSL --retry 3 -H 'User-Agent: QueuePilot' https://api.github.com/repos/mdatiqmazumder/QueuePilot/commits/main -o "$stage/revision.json"
+  local revision
+  revision=$(/usr/bin/python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["sha"])' "$stage/revision.json")
+  [[ "$revision" =~ ^[a-f0-9]{40}$ ]]
+  curl -fL --retry 3 "https://github.com/mdatiqmazumder/QueuePilot/archive/$revision.tar.gz" -o "$stage/source.tar.gz"
   mkdir "$stage/source"
   /usr/bin/python3 - "$stage" <<'PY'
 import sys, tarfile
@@ -31,7 +75,7 @@ stage = Path(sys.argv[1])
 with tarfile.open(stage / 'source.tar.gz') as archive:
     archive.extractall(stage / 'source', filter='data')
 PY
-  local source="$stage/source/QueuePilot-main"
+  local source="$stage/source/QueuePilot-$revision"
   test -f "$source/panel/app.py"
   test -f "$source/requirements.txt"
   test -f "$source/bin/queuepilot"
@@ -45,7 +89,10 @@ PY
   sleep 3
   systemctl is-active --quiet "$SERVICE"
   install -m 0755 "$source/bin/queuepilot" /usr/local/bin/queuepilot
+  printf '%s\n' "$revision" > "$INSTALL_DIR/.installed-revision"
+  /usr/local/bin/queuepilot setup-ui-updates
   stopped=0
+  update_state success
   echo "QueuePilot updated. Backup: $backup"
 )
 action() {
@@ -59,6 +106,7 @@ action() {
     settings) (cd "$INSTALL_DIR" && .venv/bin/python -m panel.configure); systemctl restart "$SERVICE"; echo 'Settings saved; restarted.' ;;
     doctor) (cd "$INSTALL_DIR" && .venv/bin/python -m panel.doctor) ;;
     update) update_panel ;;
+    setup-ui-updates) setup_ui_updates ;;
     help) echo 'queuepilot [start|stop|restart|status|logs|follow|enable|disable|settings|password|doctor|update|help]' ;;
     *) echo "Unknown command: $1"; return 1 ;;
   esac

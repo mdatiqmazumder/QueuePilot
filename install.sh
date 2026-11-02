@@ -84,6 +84,7 @@ UMask=0077
 WantedBy=multi-user.target
 EOF
   systemctl daemon-reload
+  /usr/local/bin/queuepilot setup-ui-updates
   systemctl enable --now queuepilot
   sleep 2
   if ! systemctl is-active --quiet queuepilot; then

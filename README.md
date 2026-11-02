@@ -229,4 +229,6 @@ Back up the MySQL database, `/opt/queuepilot/.env`, and `data/smtp.key`. Executi
 
 Run `queuepilot update` to download the latest GitHub source, back up the installation, install requirements, and restart the panel. Settings and `data/` are preserved. A failed update restores the installation backup and attempts to start the panel again. Backups are kept beside `/opt/queuepilot`; they do not include a MySQL database backup. Additive schema migrations run at startup, and built-in automation settings are preserved.
 
+The **Updates** page also supports **Check for updates** and **Update now**. A red dot appears beside Updates when GitHub has a newer commit. Checks are cached for five minutes. Installations without revision tracking offer an update once to establish the installed revision. Existing installations must run `queuepilot update` once in the terminal to install the UI update helper. New installations configure it automatically. The helper uses a fixed systemd path and service; the panel retains `NoNewPrivileges` and does not receive sudo access. Update progress survives the panel restart. Inspect failures with `journalctl -u queuepilot-update -n 100`.
+
 The systemd unit uses `KillMode=mixed` and `TimeoutStopSec=3700` so the panel can gracefully stop its workers before systemd performs final process-group cleanup.

@@ -26,6 +26,7 @@ from .validation import JobInput, next_time, validate_job
 from .notifications import SMTPInput, executor_event, get_value, mailer, public_settings, queue_mail, save_settings
 from .system_jobs import AutomationInput, seed_automations
 from . import telegram
+from . import updates
 from .database import TelegramDelivery
 
 hasher = PasswordHasher()
@@ -279,6 +280,25 @@ async def smtp_settings(user=Depends(auth)):
 def telegram_settings(user=Depends(auth)):
     with Session() as db:
         return telegram.public_settings(db)
+
+
+@app.get('/api/updates')
+async def update_status(user=Depends(auth)):
+    return await updates.status()
+
+
+@app.post('/api/updates/check')
+async def check_updates(user=Depends(auth)):
+    return await updates.status(force=True)
+
+
+@app.post('/api/updates/install', status_code=202)
+async def install_update(user=Depends(auth)):
+    try:
+        await updates.request_update()
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    return {'status':'queued'}
 
 
 @app.put('/api/telegram')
