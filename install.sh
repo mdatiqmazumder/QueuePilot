@@ -61,7 +61,7 @@ PY
   .venv/bin/python -m panel.firewall
   chown root:"$service_group" .env
   chmod 0640 .env
-  chown "$service_user:$service_group" data
+  chown -R "$service_user:$service_group" data
   cat > /etc/systemd/system/queuepilot.service <<EOF
 [Unit]
 Description=QueuePilot Executor Panel and scheduler
@@ -86,12 +86,16 @@ WantedBy=multi-user.target
 EOF
   systemctl daemon-reload
   /usr/local/bin/queuepilot setup-ui-updates
+  if ! systemctl is-active --quiet queuepilot-update.path; then
+    echo 'UI update helper failed to start. Inspect: journalctl -u queuepilot-update.path'; return 1
+  fi
   systemctl enable --now queuepilot
   sleep 2
   if ! systemctl is-active --quiet queuepilot; then
     echo 'Service failed. Inspect: journalctl -u queuepilot -n 50'; return 1
   fi
   echo 'Installed. Type queuepilot to open the management menu.'
+  echo 'UI updates are enabled automatically. Open Updates in the panel.'
   echo 'Health audit and daily report automations are ready. Configure SMTP in the panel under Email & alerts.'
   echo 'The panel port is allowed in UFW when available. Check any provider firewall separately.'
   if [[ -n "$temp_dir" ]]; then rm -rf -- "$temp_dir"; fi

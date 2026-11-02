@@ -22,7 +22,7 @@ def port(label, default):
 
 
 def main():
-    print('\nQueuePilot configuration — existing MySQL database required.\n')
+    print('\nQueuePilot configuration — SQLite needs no separate database server.\n')
     if Path('.env').exists():
         raise SystemExit('Configuration already exists. Edit .env to change connection settings; use panel.admin to reset passwords.')
     public_host = ask('Server IP / hostname', '127.0.0.1')
@@ -30,11 +30,20 @@ def main():
         raise ValueError('Invalid server hostname')
     host = ask('Panel listen address', '0.0.0.0')
     panel_port = port('Panel port', 8090)
-    db_host = ask('MySQL server IP / hostname', '127.0.0.1')
-    db_port = port('MySQL port', 3306)
-    db_user = ask('MySQL username', 'queuepilot')
-    db_pass = getpass.getpass('MySQL password: ')
-    db_name = ask('MySQL database name', 'queuepilot')
+    database = ask('Database type (sqlite / mysql)', 'sqlite').lower()
+    if database not in ('sqlite', 'mysql'):
+        raise ValueError('Choose sqlite or mysql')
+    data_dir = Path('data').resolve()
+    data_dir.mkdir(parents=True, exist_ok=True)
+    if database == 'mysql':
+        db_host = ask('MySQL server IP / hostname', '127.0.0.1')
+        db_port = port('MySQL port', 3306)
+        db_user = ask('MySQL username', 'queuepilot')
+        db_pass = getpass.getpass('MySQL password: ')
+        db_name = ask('MySQL database name', 'queuepilot')
+        url = URL.create('mysql+pymysql', username=db_user, password=db_pass, host=db_host, port=db_port, database=db_name, query={'charset': 'utf8mb4'})
+    else:
+        url = URL.create('sqlite', database=str(data_dir / 'queuepilot.db'))
     admin_name = ask('Panel admin username', 'admin')
     if not admin_name or len(admin_name) > 100:
         raise ValueError('Admin username must be 1–100 characters')
@@ -45,7 +54,6 @@ def main():
     if concurrent < 1:
         raise ValueError('Concurrency must be positive')
     secure = ask('Use HTTPS-only cookies? Set yes behind an HTTPS reverse proxy', 'no').lower() in ('yes', 'y')
-    url = URL.create('mysql+pymysql', username=db_user, password=db_pass, host=db_host, port=db_port, database=db_name, query={'charset': 'utf8mb4'})
     rendered = url.render_as_string(hide_password=False)
     connection = create_engine(url, pool_pre_ping=True)
     with connection.connect() as conn:
@@ -53,6 +61,7 @@ def main():
     connection.dispose()
     # Set environment before importing models, which intentionally require configuration.
     os.environ['DATABASE_URL'] = rendered
+    os.environ['DATA_DIR'] = str(data_dir)
     from .database import Base, Session, User, engine
     Base.metadata.create_all(engine)
     with Session.begin() as db:
@@ -60,7 +69,7 @@ def main():
             raise ValueError('This database already contains users. Use a dedicated empty database for a new installation.')
         db.add(User(username=admin_name, password_hash=PasswordHasher().hash(admin_pass)))
     values = dict(DATABASE_URL=rendered, PANEL_HOST=host, PANEL_PORT=str(panel_port), COOKIE_SECURE=str(secure).lower(),
-                  MAX_CONCURRENT_RUNS=str(concurrent), DATA_DIR=str(Path('data').resolve()))
+                  MAX_CONCURRENT_RUNS=str(concurrent), DATA_DIR=str(data_dir))
     def quote(value):
         if '\n' in value or '\r' in value:
             raise ValueError('Configuration values cannot contain newlines')
@@ -68,6 +77,9 @@ def main():
     with open('.env', 'x', encoding='utf-8') as file:
         file.write(''.join(f'{key}={quote(value)}\n' for key, value in values.items()))
     os.chmod('.env', 0o640)
+    if database == 'sqlite':
+        os.chmod(data_dir / 'queuepilot.db', 0o600)
+    engine.dispose()
     print(f'\nConfigured. Panel address: {"https" if secure else "http"}://{public_host}:{panel_port}\n')
 
 

@@ -43,7 +43,7 @@ PY
 }
 update_panel() (
   set -euo pipefail
-  local stage backup stopped=0
+  local stage backup stopped=0 backup_ready=0
   exec 9>/run/lock/queuepilot-update.lock
   flock -n 9 || { echo 'Another update is already running.'; exit 1; }
   stage=$(mktemp -d)
@@ -51,9 +51,17 @@ update_panel() (
   recover() {
     local result=$?
     if (( result != 0 && stopped )); then
-      echo "Update failed. Restoring $backup"
-      cp -a "$backup/." "$INSTALL_DIR/"
-      if [[ ! -f "$backup/.installed-revision" ]]; then rm -f "$INSTALL_DIR/.installed-revision"; fi
+      if (( backup_ready )); then
+        echo "Update failed. Restoring application files from $backup"
+        cp -a "$backup/panel/." "$INSTALL_DIR/panel/"
+        cp -a "$backup/.venv/." "$INSTALL_DIR/.venv/"
+        cp -a "$backup/requirements.txt" "$INSTALL_DIR/requirements.txt"
+        if [[ -f "$backup/.installed-revision" ]]; then
+          cp -a "$backup/.installed-revision" "$INSTALL_DIR/"
+        else
+          rm -f "$INSTALL_DIR/.installed-revision"
+        fi
+      fi
       systemctl start "$SERVICE" || true
     fi
     if (( result != 0 )); then update_state failed; fi
@@ -79,9 +87,11 @@ PY
   test -f "$source/panel/app.py"
   test -f "$source/requirements.txt"
   test -f "$source/bin/queuepilot"
-  cp -a "$INSTALL_DIR" "$backup"
   stopped=1
   systemctl stop "$SERVICE"
+  # Stop writers before copying SQLite's database and WAL files.
+  cp -a "$INSTALL_DIR" "$backup"
+  backup_ready=1
   cp -R "$source/panel/." "$INSTALL_DIR/panel/"
   cp "$source/requirements.txt" "$source/README.md" "$INSTALL_DIR/"
   "$INSTALL_DIR/.venv/bin/pip" install -r "$INSTALL_DIR/requirements.txt"

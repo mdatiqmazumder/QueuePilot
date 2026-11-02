@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, create_engine
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 from sqlalchemy.dialects.mysql import MEDIUMTEXT
 
@@ -13,7 +13,14 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 url = os.getenv('DATABASE_URL')
 if not url:
     raise RuntimeError('DATABASE_URL missing. Run the installer first.')
-engine = create_engine(url, pool_pre_ping=True, **({'connect_args': {'check_same_thread': False}} if url.startswith('sqlite') else {}))
+engine = create_engine(url, pool_pre_ping=True, **({'connect_args': {'check_same_thread': False, 'timeout': 30}} if url.startswith('sqlite') else {}))
+if engine.dialect.name == 'sqlite':
+    @event.listens_for(engine, 'connect')
+    def sqlite_options(connection, record):
+        cursor = connection.cursor()
+        cursor.execute('PRAGMA busy_timeout=30000')
+        cursor.execute('PRAGMA journal_mode=WAL')
+        cursor.close()
 Session = sessionmaker(engine, expire_on_commit=False)
 
 

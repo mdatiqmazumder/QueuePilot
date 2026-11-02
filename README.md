@@ -2,7 +2,7 @@
 
 Run Laravel queue workers, schedule scripts, monitor execution health, and receive email reports from one self-hosted control panel.
 
-QueuePilot provides a web dashboard on your chosen port and a `queuepilot` terminal command for managing the service. Configuration and execution history are stored in MySQL.
+QueuePilot provides a web dashboard on your chosen port and a `queuepilot` terminal command for managing the service. Configuration and execution history are stored in SQLite by default, or an existing MySQL database.
 
 ## Features
 
@@ -19,11 +19,11 @@ QueuePilot provides a web dashboard on your chosen port and a `queuepilot` termi
 
 - Ubuntu 24.x, 25.x, or 26.x with systemd; the installer has been tested on Ubuntu 24.04 under WSL2.
 - Python 3.12 or newer. The installer installs Python and creates a virtual environment.
-- An existing MySQL database and a user with permissions to create tables and indexes, alter tables for migrations, and read/write application records.
+- SQLite is included with Python and requires no separate database server. For optional MySQL mode, provide an existing database and a user with table, index, migration, and read/write permissions.
 - A non-root Linux account with access to your application directories. The default execution account is `www-data`.
 - PHP CLI and your Laravel application dependencies when using Laravel executors. QueuePilot does not install your Laravel application.
 
-Use a dedicated database for QueuePilot. Its database credentials and web admin login are separate from your Laravel application's configuration.
+SQLite creates `/opt/queuepilot/data/queuepilot.db` automatically. For MySQL, use a dedicated database for QueuePilot. Panel admin credentials are separate from your Laravel application configuration.
 
 ## Install
 
@@ -47,11 +47,11 @@ The installer asks for:
 
 1. The Linux user that will run your scripts.
 2. Server IP/hostname, panel listen address, and panel port.
-3. MySQL host, port, username, password, and database name.
+3. Database type: **sqlite** (default) or **mysql**. MySQL asks for host, port, username, password, and database name.
 4. Admin username and a password of at least 12 characters.
 5. Maximum concurrent executions and whether cookies require HTTPS.
 
-An empty MySQL password is accepted when permitted by your database server. The database must already exist. The installer creates QueuePilot's tables, enables its systemd service, and creates the built-in automations.
+SQLite requires no database credentials. In MySQL mode, the database must already exist; an empty password is accepted when allowed by your server. The installer creates the tables, enables the panel and UI update helper automatically, and seeds the built-in automations.
 
 Open `http://SERVER_IP:PANEL_PORT` and sign in with the admin credentials you selected.
 
@@ -185,9 +185,9 @@ Health audits inspect processes and configuration; they do not prove that a runn
 
 Executors run as the Linux account selected during installation. Give that account the necessary access to your project, including Laravel's `storage/` and `bootstrap/cache/` directories. QueuePilot does not switch Linux users per executor. Only trusted administrators should have access to this command-execution panel.
 
-The default concurrency is 8. Lists and history are paginated in groups of 50. Resource capacity depends on CPU, memory, disk, and MySQL performance; there is no fixed executor record limit.
+The default concurrency is 8. Lists and history are paginated in groups of 50. Resource capacity depends on CPU, memory, disk, and database performance; there is no fixed executor record limit.
 
-Each run stores the last 256 KiB of combined stdout/stderr in MySQL. Scheduled timeouts kill the Linux process group; manual Stop/Cancel first attempts graceful termination. Interrupted running executions are recorded when the panel recovers. Commands must remain in the foreground rather than daemonizing themselves.
+Each run stores the last 256 KiB of combined stdout/stderr in the selected database. Scheduled timeouts kill the Linux process group; manual Stop/Cancel first attempts graceful termination. Interrupted running executions are recorded when the panel recovers. Commands must remain in the foreground rather than daemonizing themselves.
 
 Run one panel process and one Uvicorn worker per installation. The data-directory lock prevents duplicate local processes. Sharing one QueuePilot database across several active panel servers is not supported.
 
@@ -222,16 +222,18 @@ pip install -r requirements-dev.txt
 pytest -q
 ```
 
-Tests use a temporary SQLite database and include local SMTP capture. Production uses MySQL, so deployed MySQL/systemd smoke tests are separate. Initialize a local configuration with `python -m panel.setup`, then run `python -m panel.serve`.
+Tests use a temporary SQLite database and include local SMTP capture. Both SQLite and MySQL are supported; deployed MySQL/systemd checks are separate. Initialize a local configuration with `python -m panel.setup`, then run `python -m panel.serve`.
 
 Windows supports API/UI development; the production installer, systemd integration, and process-group lifecycle are intended for Linux.
 
 ## Backup and updates
 
-Back up the MySQL database, `/opt/queuepilot/.env`, and `data/smtp.key`. Execution and email history live in MySQL. There is no automatic log-retention policy.
+Back up the selected database, `/opt/queuepilot/.env`, and `data/smtp.key`. For SQLite, stop the panel before copying `data/` (including any WAL files), or use SQLite's online backup API. For MySQL, use a database backup. Execution and delivery history live in the selected database. There is no automatic log-retention policy.
 
-Run `queuepilot update` to download the latest GitHub source, back up the installation, install requirements, and restart the panel. Settings and `data/` are preserved. A failed update restores the installation backup and attempts to start the panel again. Backups are kept beside `/opt/queuepilot`; they do not include a MySQL database backup. Additive schema migrations run at startup, and built-in automation settings are preserved.
+Run `queuepilot update` to download the latest GitHub source, stop the panel, back up the installation, install requirements, and restart the panel. The backup includes SQLite data while writes are stopped. A failed update restores application files and dependencies and attempts to start the panel again; it does not roll back database changes. Backups are kept beside `/opt/queuepilot`; they do not include a MySQL database backup. Additive schema migrations run at startup, and built-in automation settings are preserved.
 
-The **Updates** page also supports **Check for updates** and **Update now**. A red dot appears beside Updates when GitHub has a newer commit. Checks are cached for five minutes. Installations without revision tracking offer an update once to establish the installed revision. Existing installations must run `queuepilot update` once in the terminal to install the UI update helper. New installations configure it automatically. The helper uses a fixed systemd path and service; the panel retains `NoNewPrivileges` and does not receive sudo access. Update progress survives the panel restart. Inspect failures with `journalctl -u queuepilot-update -n 100`.
+The **Updates** page also supports **Check for updates** and **Update now**. A red dot appears beside Updates when GitHub has a newer commit. Checks are cached for five minutes. Installations without revision tracking offer an update once to establish the installed revision. New installations configure and verify the UI update helper automatically; no separate setup command is needed. Older installations created before this feature need one terminal update to install the helper. The helper uses a fixed systemd path and service; the panel retains `NoNewPrivileges` and does not receive sudo access. Update progress survives the panel restart. Inspect failures with `journalctl -u queuepilot-update -n 100`.
 
 The systemd unit uses `KillMode=mixed` and `TimeoutStopSec=3700` so the panel can gracefully stop its workers before systemd performs final process-group cleanup.
+
+Existing MySQL installations keep their database configuration when updated. Selecting SQLite is for a fresh installation; changing DATABASE_URL does not migrate existing records.
