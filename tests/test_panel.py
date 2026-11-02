@@ -192,7 +192,9 @@ def test_continuous_lifetime_stop_start_and_cancel(client):
 
 
 @pytest.mark.parametrize('exit_code',[0,7])
-def test_continuous_exit_automatically_restarts(client,exit_code):
+def test_continuous_exit_automatically_restarts(client,exit_code,monkeypatch):
+    events=[]
+    monkeypatch.setattr('panel.runner.executor_event',lambda db,job,category,*args,**kwargs: events.append((job.id,category)))
     headers=sign_in(client)
     data=payload(f'import sys; print("EXITING"); sys.exit({exit_code})')
     data.update(mode='continuous', enabled=True, restart_delay=1, stop_grace=2)
@@ -206,6 +208,11 @@ def test_continuous_exit_automatically_restarts(client,exit_code):
         first=client.get(f'/api/runs/{runs[-1]["id"]}').json()
         assert first['exit_code']==exit_code
         assert first['status']==('success' if exit_code==0 else 'failed')
+        job_events=[category for event_job,category in events if event_job==job_id]
+        if exit_code==0:
+            assert job_events==[]
+        else:
+            assert job_events and set(job_events)=={'failure'}
         from datetime import datetime
         assert (datetime.fromisoformat(runs[0]['queued_at'])-datetime.fromisoformat(first['finished_at'])).total_seconds()>=1
     finally:

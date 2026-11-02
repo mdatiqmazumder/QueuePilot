@@ -251,8 +251,6 @@ class Runner:
                             executor_event(db, job, 'failure', f'Execution {status}', run.id, code)
                         elif status in ('cancelled', 'interrupted'):
                             executor_event(db, job, 'stop', f'Execution {status}', run.id, code)
-                        elif job.mode == 'continuous':
-                            executor_event(db, job, 'stop', 'Continuous process exited; restart scheduled', run.id, code)
 
 
 runner = Runner()

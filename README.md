@@ -139,6 +139,7 @@ Open **Email & alerts**, enter your SMTP host, port, security mode, username/pas
 - Leaving the password blank keeps the saved password; **Remove saved password** clears it.
 - Failure/timeout, stop/interruption, and health notifications can be enabled separately.
 - Manual Stop, Cancel, and Pause events also generate alerts when their notification category is enabled.
+- Successful continuous worker exits (exit code 0), including Laravel's `--max-time` recycling and `queue:restart`, restart normally without sending a stop email. Nonzero exits still generate failure alerts.
 - Repeat alerts for the same executor/event use a configurable cooldown, defaulting to 15 minutes.
 
 Messages are stored in a durable outbox and processed independently of executor slots. Failed delivery is retried up to three attempts, with delays of 60 and 300 seconds between attempts. Delivery history shows pending, sending, sent, failed, or cancelled status, attempts, and sanitized SMTP error details. **Sent** means the SMTP server accepted the message; it does not guarantee inbox delivery. Saving SMTP configuration cancels older pending mail. A crash immediately after SMTP acceptance may cause a duplicate on recovery with the same Message-ID.
